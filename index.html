@@ -33,7 +33,7 @@
         }
         #map {
             width: 80%;
-            height: 540px;
+            height: 800px;
             margin: 10px auto;
         }
         footer {
@@ -89,11 +89,11 @@
     <script src="js_files\phillyTraffic2018.js"></script>
     <script>
         
-        var blackMap = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+/*        var blackMap = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
           subdomains: 'abcd',
           maxZoom: 19
-        });
+        });*/
         
         var streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -107,7 +107,7 @@
        var map = L.map('map', {
           center: [39.9999,-75.1652],
           zoom: 11,
-          layers: blackMap 
+          layers: streetMap 
       });
 
 //Philadelphia Streets layer, uses the trafficColor() function to color the roads baised onhow much traffic they get,
@@ -352,7 +352,7 @@ legend.addTo(map);//adds legend to map
 
 //builds buttons to change basemap
 var baseMaps = {
-"<b>Black Map</b>": blackMap,
+//"<b>Black Map</b>": blackMap,
 "<b>Streets Map</b>": streetMap,
 "<b>Imagery Map</b>": imageryMap
 }
