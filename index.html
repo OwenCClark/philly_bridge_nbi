@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8 />
+    <title>Philadelphia Bridges</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/leaflet.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/leaflet.css" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: whitesmoke;
+            font-family: Lato, sans-serif;
+            color: #0D0000;
+        }
+
+        header {
+            padding: 6px 10%;
+        }
+
+        h1 {
+            display: inline-block;
+            margin-right: 20px;
+            color: #001323;
+        }
+
+        h2 {
+            display: inline-block;
+            color: #001323;
+        }
+
+        #map {
+            width: 80%;
+            height: 800px;
+            margin: 10px auto;
+        }
+
+        footer {
+            padding: 6px 10%;
+            width: 80%;
+        }
+
+        p {
+            font-size: 1em;
+            color: #001323;
+        }
+
+        .info {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .info h4 {
+            margin: 0 0 5px;
+            color: #777;
+        }
+
+        .legend {
+            line-height: 18px;
+            color: #555;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 16px;
+            float: left;
+            margin-right: 8px;
+            opacity: 1;
+        }
+
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Bridge Locations in Philadelphia:</h1>
+        <h2>NBI_RATING</h2>
+    </header>
+
+    <div id='map'></div>
+
+    <footer>
+        <p>Map authored by Owen Clark</p>
+        <p>Data for this map can be found <a href="http://www.pasda.psu.edu/">here</a></p>
+        <p>NBI rating information can be found <a href="https://en.wikipedia.org/wiki/National_Bridge_Inventory#Structural_evaluation_scale">here</a></p>
+    </footer>
+
+    <script src="js_files\phillyBridges2018.js"></script>
+    <script src="js_files\PhillyPlanning_City_Limits.js"></script>
+    <script src="js_files\phillyTraffic2018.js"></script>
+    <script>
+        /*        var blackMap = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
+        });*/
+
+        var streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19,
+        })
+
+        var imageryMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        var map = L.map('map', {
+            center: [39.9999, -75.1652],
+            zoom: 11,
+            layers: streetMap
+        });
+
+        //Philadelphia Streets layer, uses the trafficColor() function to color the roads baised onhow much traffic they get,
+        //the darker the red the more traffic that road carries
+        var phillyTraffic = L.geoJson(traffic, {
+            style: function(feature) {
+                return {
+                    color: trafficColor(feature.properties.CUR_AADT)
+                }
+            }
+        }).addTo(map)
+
+        //Simple boarder for Philadelphia County, gives spatial context for roads and bridges
+        var phillyBoarders = L.geoJson(phillyBounds, {
+            style: function(feature) {
+                return {
+                    stroke: true,
+                    weight: 4,
+                    fillOpacity: 0,
+                    color: 'grey'
+                }
+            }
+        }).addTo(map)
+
+        //Bridges layer that is filtered to return only bridges with an NBI score of 0, these bridges meet NBI requirements
+        //uses getPopup() to build infor popup on click
+        //uses getColor() to color circleMarker based on NBI_RATING
+        //uses info.update() to send properties to custom control which displays bridges information in top right corner
+        //changes radius from 6 to 10 on mouseover for effect
+        var bridgesNBI_0 = L.geoJson(bridges, {
+            pointToLayer: function(feature, latlng) {
+                return L.circleMarker(latlng);
+            },
+            filter: function(feature) {
+                if (feature.properties.NBI_RATING == 0) {
+                    return feature;
+                }
+            },
+            onEachFeature: function(feature, layer) {
+                layer.bindPopup(getPopup(layer.feature.properties));
+                layer.on('mouseover', function() {
+                    info.update(layer.feature.properties);
+                    layer.bringToFront();
+                    layer.setStyle({
+                        radius: 10
+                    });
+                });
+                layer.on('mouseout', function() {
+                    info.update();
+                    bridgesNBI_0.resetStyle(this);
+                });
+            },
+            style: function(feature) {
+                return {
+                    stroke: false,
+                    color: getColor(feature.properties.NBI_RATING),
+                    fillColor: getColor(feature.properties.NBI_RATING),
+                    fillOpacity: 1,
+                    radius: 6
+                }
+            }
+        }).addTo(map); //adds bridgesNBI_0 to map
+
+        //Bridges layer that is filtered to return only bridges with an NBI score of 1, these bridges do not meet NBI requirements and are structurally defecient
+        //uses getPopup() to build infor popup on click
+        //uses getColor() to color circleMarker based on NBI_RATING
+        //uses info.update() to send properties to custom control which displays bridges information in top right corner
+        //changes radius from 6 to 10 on mouseover for effect        
+        var bridgesNBI_1 = L.geoJson(bridges, {
+            pointToLayer: function(feature, latlng) {
+                return L.circleMarker(latlng);
+            },
+            filter: function(feature) {
+                if (feature.properties.NBI_RATING == 1) {
+                    return feature;
+                }
+            },
+            onEachFeature: function(feature, layer) {
+                layer.bindPopup(getPopup(layer.feature.properties));
+                layer.on('mouseover', function() {
+                    info.update(layer.feature.properties);
+                    layer.bringToFront();
+                    layer.setStyle({
+                        radius: 10
+                    });
+                });
+                layer.on('mouseout', function() {
+                    info.update();
+                    bridgesNBI_1.resetStyle(this);
+                });
+            },
+            style: function(feature) {
+                return {
+                    stroke: false,
+                    color: getColor(feature.properties.NBI_RATING),
+                    fillColor: getColor(feature.properties.NBI_RATING),
+                    fillOpacity: 1,
+                    radius: 6
+                }
+            }
+        }).addTo(map); //adds bridgesNBI_1 to map
+
+        //Bridges layer that is filtered to return only bridges with an NBI score of 1, these bridges do not meet NBI requirements and are structurally obsolete
+        //uses getPopup() to build infor popup on click
+        //uses getColor() to color circleMarker based on NBI_RATING
+        //uses info.update() to send properties to custom control which displays bridges information in top right corner
+        //changes radius from 6 to 10 on mouseover for effect
+        var bridgesNBI_2 = L.geoJson(bridges, {
+            pointToLayer: function(feature, latlng) {
+                return L.circleMarker(latlng);
+            },
+            filter: function(feature) {
+                if (feature.properties.NBI_RATING == 2) {
+                    return feature;
+                }
+            },
+            onEachFeature: function(feature, layer) {
+                layer.bindPopup(getPopup(layer.feature.properties));
+                layer.on('mouseover', function() {
+                    info.update(layer.feature.properties);
+                    layer.bringToFront();
+                    layer.setStyle({
+                        radius: 10
+                    });
+                });
+                layer.on('mouseout', function() {
+                    info.update();
+                    bridgesNBI_2.resetStyle(this);
+                });
+            },
+            style: function(feature) {
+                return {
+                    stroke: false,
+                    color: getColor(feature.properties.NBI_RATING),
+                    fillColor: getColor(feature.properties.NBI_RATING),
+                    fillOpacity: 1,
+                    radius: 6
+                }
+            }
+        }).addTo(map); //adds bridgesNBI_2 to map
+
+        //used to color phillyTraffic layer based on how much AADT each line segment carries, breaks are Natural Breaks from QGIS
+        function trafficColor(traffic) {
+            return traffic > 73874 ? "#b10026" :
+                traffic > 37660 ? "#e31a1c" :
+                traffic > 20761 ? "#fc4e2a" :
+                traffic > 12433 ? "#fd8d3c" :
+                traffic > 7182 ? "#feb24c" :
+                traffic > 2958 ? "#fed976" :
+                "#ffffb2";
+        }
+
+        //builds popup for each bridge on click
+        //uses getRebuilt() to return the year a bridge was reconstructed or the string "Never" if the bridge has not been reconstructed
+        //uses getOwner to return the name of the bridge owner in place of number code
+        function getPopup(props) {
+            return "<b>Location: " + props.LOCATION + "</b><br>" +
+                "<b>NBI Rating: " + props.NBI_RATING + "</b><br>" +
+                "<b>Year Built: " + props.YEARBUILT + "</b><br>" +
+                "<b>Year Reconstructed: " + getRebuilt(props.YEARRECON) + "</b><br>" +
+                "<b>Next NBI Inspection Date: " + props.NEXTINSP + "</b><br>" +
+                "<b>Owner: " + getOwner(props.OWNER) + "</b><br>";
+        }
+
+        //returns the year a bridge was reconstructed or the string "Never" in place of 0 if the bridge has not been reconstructed
+        function getRebuilt(year) {
+            return year == 0 ? "Never" :
+                year;
+        }
+
+        //returns color for circleMarkers based on NBI rating
+        function getColor(nbiRating) {
+            return nbiRating == 0 ? '#1a9850' :
+                nbiRating == 1 ? '#d73027' :
+                '#ffffbf';
+        }
+
+        //returns the name of the entity that owns each bridge in place of a number
+        function getOwner(owner) {
+            return owner == 01 ? "State Highway Agency" :
+                owner == 02 ? "County Highway Agency" :
+                owner == 03 ? "Town or Township Highway Agency" :
+                owner == 04 ? "City, Municapal, Highway Agency, or Borough" :
+                owner == 11 ? "State Park, Forest, or Reservation Agency" :
+                owner == 12 ? "Local Park, Forest, or Reservation Agency" :
+                owner == 21 ? "Other State Agency" :
+                owner == 25 ? "Other Local Agency" :
+                owner == 26 ? "Private (Other than Railroad)" :
+                owner == 27 ? "Railroad" :
+                owner == 31 ? "State Toll Authority" :
+                owner == 32 ? "Local Toll Authority" :
+                owner == 60 ? "Other Federal Agencies" :
+                owner == 62 ? "Bureau of Indian Affairs" :
+                owner == 64 ? "US Forest Service" :
+                owner == 66 ? "National Park Service" :
+                owner == 68 ? "Bureau of Land Management" :
+                owner == 69 ? "Bureau of Reclamation" :
+                owner == 70 ? "Military Reservation Corps of Engineers" :
+                "Unknown";
+        }
+
+        //creates custom control variable "info"
+        var info = L.control({
+            position: 'topright'
+        });
+
+
+        info.onAdd = function(map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+
+        //update function that builds information display if layer properties are sent to function
+        //otherwise prompts user to mouseover bridge feature
+        info.update = function(props) {
+            this._div.innerHTML = '<h4>Bridges in Philadelphia County</h4>' + (props ?
+                "<b>Location: " + props.LOCATION + "</b><br>" +
+                "<b>NBI Rating: " + props.NBI_RATING + "</b><br>" +
+                "<b>Year Built: " + props.YEARBUILT + "</b><br>" :
+                'Hover over a bridge');
+        };
+
+        info.addTo(map); //adds custom control layer "info" to map
+
+        // creates legend variable 
+        var legend = L.control({
+            position: 'bottomleft'
+        });
+
+        //populates legend labels and colors in a loop
+        legend.onAdd = function(map) {
+
+            var div = L.DomUtil.create('div', 'info legend'),
+                colors = ['#1a9850', '#d73027', '#ffffbf'],
+                labels = ["NBI Rating: 0 - Not Deficient", "NBI Rating: 1 - Structurally Deficient", "NBI Rating: 2 - Functionally Obsolete"];
+
+            for (var i = 0; i < labels.length; i++) {
+                div.innerHTML += '<i class:"circle" style="background:' + colors[i] + '"></i>' + labels[i] + '<br>';
+            }
+
+            return div;
+        };
+
+        legend.addTo(map); //adds legend to map
+
+        // creates legend variable 
+        var legend2 = L.control({
+            position: 'bottomleft'
+        });
+
+        //populates legend labels and colors in a loop
+        legend2.onAdd = function(map) {
+
+            var div = L.DomUtil.create('div', 'info legend'),
+                colors = ["#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c", "#feb24c", "#fed976", "#ffffb2"],
+                labels = ["traffic > 73874", "traffic > 37660", "traffic > 20761", "traffic > 12433", "traffic > 7182", "traffic > 2958", "traffic < 2957"];
+
+            for (var i = 0; i < labels.length; i++) {
+                div.innerHTML += '<i class:"circle" style="background:' + colors[i] + '"></i>' + labels[i] + '<br>';
+            }
+            return div;
+        };
+
+        legend2.addTo(map); //adds legend to map   
+
+        //builds buttons to change basemap
+        var baseMaps = {
+            //"<b>Black Map</b>": blackMap,
+            "<b>Streets Map</b>": streetMap,
+            "<b>Imagery Map</b>": imageryMap
+        }
+
+        //builds button to turn on and off bridge layers based on NBI rating
+        var sourcesLayers = {
+            "<b>bridges NBI Rating: 0</b>": bridgesNBI_0,
+            "<b>bridges NBI Rating: 1</b>": bridgesNBI_1,
+            "<b>bridges NBI Rating: 2</b>": bridgesNBI_2,
+        }
+
+        //adds custom control to change basemaps and turn on and off bridge layers
+        L.control.layers(baseMaps, sourcesLayers, {
+            position: 'bottomright',
+            collapsed: false
+        }).addTo(map);
+
+    </script>
+
+</body>
+
+</html>
